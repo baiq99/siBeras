@@ -8,24 +8,18 @@ from PIL import Image as PILImage
 from io import BytesIO
 from base64 import b64decode
 
-# Inisialisasi Flask
 app = Flask(__name__)
 UPLOAD_FOLDER = 'static/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Load model dan scaler
 model = joblib.load('model/svm_model.pkl')
 scaler = joblib.load('model/scaler.pkl')
 class_labels = model.classes_.tolist()
 
-# ==== Fungsi Preprocessing & Ekstraksi Fitur ====
-
 def adjust_background(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    adaptive = cv2.adaptiveThreshold(
-        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY_INV, 21, 10)
+    adaptive = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 21, 10)
     contours, _ = cv2.findContours(adaptive, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     mask = np.zeros_like(gray)
     cv2.drawContours(mask, contours, -1, 255, -1)
@@ -83,8 +77,6 @@ def predict_from_image(image):
     prob_dict = {label: f"{prob*100:.2f}%" for label, prob in zip(class_labels, probabilities)}
     return prediction, confidence, prob_dict
 
-# ==== ROUTES ====
-
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -92,16 +84,14 @@ def index():
 @app.route('/predict', methods=['POST'])
 def predict():
     file = request.files.get('image')
-    camera_data = request.form.get('cameraImage')  # data base64 dari canvas JS
+    camera_data = request.form.get('cameraImage')
 
-    # === PRIORITAS 1: File upload ===
     if file and file.filename != '':
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
         image = cv2.imread(filepath)
 
-    # === PRIORITAS 2: Gambar base64 dari kamera ===
     elif camera_data:
         try:
             img_data = b64decode(camera_data.split(',')[1])
@@ -124,7 +114,4 @@ def predict():
                            image_path=filepath,
                            prob_dict=prob_dict)
 
-# ==== RUN ====
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(debug=False, host='0.0.0.0', port=port)
+# Tidak ada app.run di sini karena akan dijalankan oleh Gunicorn
